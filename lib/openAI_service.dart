@@ -2,271 +2,124 @@ import 'dart:convert' show jsonDecode, jsonEncode;
 import 'package:aman_artify/secret.dart';
 import 'package:http/http.dart' as http;
 
-class OpenAIService{
-
+class OpenAIService {
   final List<Map<String, String>> messages = [];
 
-  // Future<String> isArtPromptAPI(String prompt) async {
-  //   try {
-  //     final res = await http.post(
-  //       Uri.parse('https://api.openai.com/v1/chat/completions'),
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': 'Bearer $openAIAPIKEY',
-  //       },
-  //       body: jsonEncode({
-  //         "model": "gpt-4.1-mini",
-  //         "messages": [
-  //           {
-  //             "role": "system",
-  //             "content": "You are a helpful assistant."
-  //           },
-  //           {
-  //             "role": "user",
-  //             "content":
-  //             "Does the user want to generate an AI image, picture, art, or anything similar with this message: '$prompt'? Just answer with yes or no."
-  //           }
-  //         ],
-  //       }),
-  //     );
-  //
-  //     print("🔵 OpenAI response: ${res.body}");
-  //
-  //     if (res.statusCode == 200) {
-  //       String content =
-  //       jsonDecode(res.body)['choices'][0]['message']['content'].trim();
-  //
-  //       if (content.toLowerCase().contains("yes")) {
-  //         return await dalleAPI(prompt);
-  //       } else {
-  //         return await chatGPTAPI(prompt);
-  //       }
-  //     }
-  //
-  //     return "❌ Error: ${res.statusCode} - ${res.body}";
-  //   }
-  //   catch (e) {
-  //     return "❗ Exception: $e";
-  //   }
-  // }
-
-// // way 2 for isArtPromptAPI.
-//   Future<String> isArtPromptAPI(String prompt) async {
-//     try {
-//       final res = await http.post(
-//         Uri.parse('https://api.openai.com/v1/chat/completions'),
-//         headers: {
-//           'Content-Type': 'application/json',
-//           'Authorization': 'Bearer $openAIAPIKEY',
-//         },
-//         body: jsonEncode({
-//           "model": "gpt-4.1-mini",
-//           "messages": [
-//             {
-//               "role": "system",
-//               "content": "You are a helpful assistant."
-//             },
-//             {
-//               "role": "user",
-//               "content":
-//               "Does the user want to generate an AI image, picture, art, or anything similar with this message: '$prompt'? Just answer with yes or no."
-//             }
-//           ],
-//         }),
-//       );
-//
-//       print("🔵 OpenAI response: ${res.body}");
-//
-//       if (res.statusCode == 200) {
-//         String content = jsonDecode(res.body)['choices'][0]['message']['content']
-//             .trim()
-//             .toLowerCase();
-//
-//         if (content.contains("yes")) {
-//           String base64Image = await dalleAPI(prompt);
-//           messages.add({
-//             'role': 'assistant',
-//             'content': base64Image,
-//             'type': 'image', // 👈 for UI detection
-//           });
-//           return "🖼️ Image generated.";
-//         } else {
-//           String response = await chatGPTAPI(prompt);
-//           messages.add({
-//             'role': 'assistant',
-//             'content': response,
-//             'type': 'text',
-//           });
-//           return response;
-//         }
-//       }
-//
-//       return "❌ Error: ${res.statusCode} - ${res.body}";
-//     } catch (e) {
-//       return "❗ Exception: $e";
-//     }
-//   }
-
-// // WAY 3
-  Future<String> isArtPromptAPI(String prompt) async {
+  /// Main method: handles prompt, decides between image/text, returns result
+  Future<Map<String, String>> handlePrompt(String prompt) async {
     try {
-      final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $openAIAPIKEY',
-        },
-        body: jsonEncode({
-          "model": "gpt-4.1-mini",
-          "messages": [
-            {
-              "role": "system",
-              "content": "You are a helpful assistant."
-            },
-            {
-              "role": "user",
-              "content": "Does the user want to generate an AI image, picture, art, or anything similar with this message: '$prompt'? Just answer with yes or no."
-            }
-          ],
-        }),
-      );
+      final isArt = await _isArtPrompt(prompt);
 
-      print("🔵 GPT Response for detection: ${res.body}");
-
-      if (res.statusCode == 200) {
-        String answer = jsonDecode(res.body)['choices'][0]['message']['content']
-            .trim()
-            .toLowerCase();
-
-        if (answer.contains("yes")) {
-          String base64Image = await dalleAPI(prompt);
-          messages.add({
-            'role': 'assistant',
-            'content': base64Image,
-            'type': 'image', // 👈 for UI display
-          });
-          return base64Image; // This is the image, not text
-        } else {
-          String chat = await chatGPTAPI(prompt);
-          messages.add({
-            'role': 'assistant',
-            'content': chat,
-            'type': 'text',
-          });
-          return chat;
-        }
+      if (isArt) {
+        final image = await _dalleAPI(prompt);
+        
+        return {'type': 'image', 'content': image};
+      } else {
+        final reply = await _chatGPTAPI(prompt);
+        
+        return {'type': 'text', 'content': reply};
       }
-
-      return "❌ Error: ${res.statusCode} - ${res.body}";
     } catch (e) {
-      return "❗ Exception: $e";
+      return {'type': 'error', 'content': '❗ Exception: $e'};
     }
   }
 
 
-  Future<String> chatGPTAPI(String prompt) async {
+  /// Classifies if input is image/art-related using GPT
+  Future<bool> _isArtPrompt(String prompt) async {
+    final res = await http.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $openAIAPIKEY',
+      },
+      body: jsonEncode({
+        "model": "gpt-4.1-mini",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant."
+          },
+          {
+            "role": "user",
+            "content":
+            "Does the user want to generate an AI image, picture, art, or anything similar with this message: '$prompt'? Just answer with yes or no."
+          }
+        ],
+      }),
+    );
 
+    print("🟢 GPT Classifier Response: ${res.body}");
+
+    if (res.statusCode == 200) {
+      final answer = jsonDecode(res.body)['choices'][0]['message']['content']
+          .trim()
+          .toLowerCase();
+      return answer.contains("yes");
+    } else {
+      throw Exception("Failed to classify prompt: ${res.statusCode}");
+    }
+  }
+
+  /// Handles ChatGPT conversation
+  Future<String> _chatGPTAPI(String prompt) async {
     messages.add({
       'role': 'user',
       'content': prompt,
       'type': 'text',
     });
 
-    try {
-      final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $openAIAPIKEY',
-        },
-        body: jsonEncode({
-          "model": "gpt-4.1-mini",
-          "messages": messages,
-        }),
-      );
+    final openAIMessages = messages
+        .map((msg) => {
+      'role': msg['role'] ?? 'user', // fallback to avoid null
+      'content': msg['content'] ?? '',
+    })
+        .toList();
 
-      if (res.statusCode == 200) {
-        String content =
-            jsonDecode(res.body)['choices'][0]['message']['content'].trim();
+    final res = await http.post(
+      Uri.parse('https://api.openai.com/v1/chat/completions'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $openAIAPIKEY',
+      },
+      body: jsonEncode({
+        "model": "gpt-4.1-mini",
+        "messages": openAIMessages,
+      }),
+    );
 
-        messages.add({
-          'role': 'assistant',
-          'content': content,
-          'type': 'text',
-        });
+    print("💬 ChatGPT Response: ${res.body}");
 
-        return content;
-      }
-
-      return "❌ Error: ${res.statusCode} - ${res.body}";
-    }
-    catch (e) {
-      return "❗ Exception: $e";
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['choices'][0]['message']['content'].trim();
+    } else {
+      throw Exception("ChatGPT Error: ${res.body}");
     }
   }
 
-  // Future<String> dalleAPI(String prompt) async {
-  //   try {
-  //     final res = await http.post(
-  //       Uri.parse('https://api.openai.com/v1/images/generations'),
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': 'Bearer $openAIAPIKEY',
-  //       },
-  //       body: jsonEncode({
-  //         "model": "gpt-image-1",  // or "dall-e-3"
-  //         "prompt": prompt,
-  //         "n": 1,
-  //         "size": "1024x1024",
-  //         "response_format": "b64_json"
-  //       }),
-  //     );
-  //
-  //     print("🔵 OpenAI response: ${res.body}");
-  //
-  //     if (res.statusCode == 200) {
-  //
-  //       String base64Image = jsonDecode(res.body)['data'][0]['b64_json'].trim();
-  //
-  //       return base64Image;
-  //     }
-  //
-  //     return "❌ Error: ${res.statusCode} - ${res.body}";
-  //   } catch (e) {
-  //     return "❗ Exception: $e";
-  //   }
-  // }
+  /// Handles image generation via DALL·E
+  Future<String> _dalleAPI(String prompt) async {
+    final res = await http.post(
+      Uri.parse('https://api.openai.com/v1/images/generations'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $openAIAPIKEY',
+      },
+      body: jsonEncode({
+        "model": "dall-e-3",
+        "prompt": prompt,
+        "n": 1,
+        "size": "1024x1024",
+        "response_format": "b64_json",
+      }),
+    );
 
-  Future<String> dalleAPI(String prompt) async {
-    try {
-      final res = await http.post(
-        Uri.parse('https://api.openai.com/v1/images/generations'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $openAIAPIKEY',
-        },
-        body: jsonEncode({
-          "model": "dall-e-3",
-          "prompt": prompt,
-          "n": 1,
-          "size": "1024x1024",
-          "response_format": "b64_json", // 👈 REQUIRED!
-        }),
-      );
+    print("🖼️ DALL·E Response: ${res.body}");
 
-      print("🔵 DALL·E response: ${res.body}");
-
-      if (res.statusCode == 200) {
-        // Make sure to extract and return base64 string
-        String base64Image = jsonDecode(res.body)['data'][0]['b64_json'].trim();
-        return base64Image;
-      }
-
-      return "❌ Error: ${res.statusCode} - ${res.body}";
-    } catch (e) {
-      return "❗ Exception: $e";
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['data'][0]['b64_json'].trim();
+    } else {
+      throw Exception("DALL·E Error: ${res.statusCode}");
     }
   }
-
-
 }
