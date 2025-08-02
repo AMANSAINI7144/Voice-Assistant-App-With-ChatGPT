@@ -12,18 +12,17 @@ class OpenAIService {
 
       if (isArt) {
         final image = await _dalleAPI(prompt);
-        
+
         return {'type': 'image', 'content': image};
       } else {
         final reply = await _chatGPTAPI(prompt);
-        
+
         return {'type': 'text', 'content': reply};
       }
     } catch (e) {
       return {'type': 'error', 'content': '❗ Exception: $e'};
     }
   }
-
 
   /// Classifies if input is image/art-related using GPT
   Future<bool> _isArtPrompt(String prompt) async {
@@ -36,15 +35,12 @@ class OpenAIService {
       body: jsonEncode({
         "model": "gpt-4.1-mini",
         "messages": [
-          {
-            "role": "system",
-            "content": "You are a helpful assistant."
-          },
+          {"role": "system", "content": "You are a helpful assistant."},
           {
             "role": "user",
             "content":
-            "Does the user want to generate an AI image, picture, art, or anything similar with this message: '$prompt'? Just answer with yes or no."
-          }
+                "Does the user want to generate an AI image, picture, art, or anything similar with this message: '$prompt'? Just answer with yes or no.",
+          },
         ],
       }),
     );
@@ -52,9 +48,9 @@ class OpenAIService {
     print("🟢 GPT Classifier Response: ${res.body}");
 
     if (res.statusCode == 200) {
-      final answer = jsonDecode(res.body)['choices'][0]['message']['content']
-          .trim()
-          .toLowerCase();
+      final answer = jsonDecode(
+        res.body,
+      )['choices'][0]['message']['content'].trim().toLowerCase();
       return answer.contains("yes");
     } else {
       throw Exception("Failed to classify prompt: ${res.statusCode}");
@@ -63,17 +59,15 @@ class OpenAIService {
 
   /// Handles ChatGPT conversation
   Future<String> _chatGPTAPI(String prompt) async {
-    messages.add({
-      'role': 'user',
-      'content': prompt,
-      'type': 'text',
-    });
+    messages.add({'role': 'user', 'content': prompt, 'type': 'text'});
 
     final openAIMessages = messages
-        .map((msg) => {
-      'role': msg['role'] ?? 'user', // fallback to avoid null
-      'content': msg['content'] ?? '',
-    })
+        .map(
+          (msg) => {
+            'role': msg['role'] ?? 'user', // fallback to avoid null
+            'content': msg['content'] ?? '',
+          },
+        )
         .toList();
 
     final res = await http.post(
@@ -82,10 +76,7 @@ class OpenAIService {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $openAIAPIKEY',
       },
-      body: jsonEncode({
-        "model": "gpt-4.1-mini",
-        "messages": openAIMessages,
-      }),
+      body: jsonEncode({"model": "gpt-4.1-mini", "messages": openAIMessages}),
     );
 
     print("💬 ChatGPT Response: ${res.body}");

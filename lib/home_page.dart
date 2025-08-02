@@ -8,7 +8,6 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'dart:convert'; // for base64Decode
 import 'package:animate_do/animate_do.dart';
 
-
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -25,6 +24,55 @@ class _HomePageState extends State<HomePage> {
   String? generatedImage;
   int start = 200;
   int delay = 200;
+
+  // Add these lines:
+  final TextEditingController _textController = TextEditingController();
+
+  Future<void> _handleTextSubmitted(String text) async {
+    if (text.trim().isEmpty) return;
+
+    setState(() {
+      lastWords = text;
+      openAIService.messages.add({'type': 'user', 'content': text});
+    });
+
+    final responseMap = await openAIService.handlePrompt(text);
+    final type = responseMap['type'];
+    final content = responseMap['content'];
+
+    if (type == 'image') {
+      setState(() {
+        generatedImage = content;
+        generatedContent = null;
+
+        openAIService.messages.add({
+          'role': 'assistant',
+          'type': 'image',
+          'content': content ?? '',
+        });
+      });
+    } else if (type == 'text') {
+      setState(() {
+        generatedContent = content;
+        generatedImage = null;
+
+        openAIService.messages.add({
+          'role': 'assistant',
+          'type': 'text',
+          'content': content ?? '',
+        });
+      });
+
+      await systemSpeak(content ?? '');
+    } else {
+      setState(() {
+        generatedContent = "Something went wrong.";
+        generatedImage = null;
+      });
+    }
+
+    _textController.clear();
+  }
 
   @override
   void initState() {
@@ -89,10 +137,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     // ✅ Only add user message ONCE
-    openAIService.messages.add({
-      'type': 'user',
-      'content': prompt,
-    });
+    openAIService.messages.add({'type': 'user', 'content': prompt});
 
     final responseMap = await openAIService.handlePrompt(prompt);
     final type = responseMap['type'];
@@ -137,15 +182,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _resetApp() {
-  setState(() {
-    generatedContent = null;
-    generatedImage = null;
-    lastWords = '';
-    openAIService.messages.clear();
-  });
-  print("🧹 Reset done");
-}
-
+    setState(() {
+      generatedContent = null;
+      generatedImage = null;
+      lastWords = '';
+      openAIService.messages.clear();
+    });
+    print("🧹 Reset done");
+  }
 
   @override
   void dispose() {
@@ -185,7 +229,9 @@ class _HomePageState extends State<HomePage> {
                     decoration: const BoxDecoration(
                       shape: BoxShape.circle,
                       image: DecorationImage(
-                        image: AssetImage('assets/images/virtual_Assistant.jpg'),
+                        image: AssetImage(
+                          'assets/images/virtual_Assistant.jpg',
+                        ),
                       ),
                     ),
                   ),
@@ -199,11 +245,18 @@ class _HomePageState extends State<HomePage> {
                 if (openAIService.messages.isEmpty)
                   FadeInRight(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      margin: const EdgeInsets.symmetric(horizontal: 40).copyWith(top: 30),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                      ).copyWith(top: 30),
                       decoration: BoxDecoration(
                         border: Border.all(color: Pallete.borderColor),
-                        borderRadius: BorderRadius.circular(20).copyWith(topLeft: Radius.zero),
+                        borderRadius: BorderRadius.circular(
+                          20,
+                        ).copyWith(topLeft: Radius.zero),
                       ),
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 10.0),
@@ -223,7 +276,10 @@ class _HomePageState extends State<HomePage> {
                 ...openAIService.messages.map((msg) {
                   if (msg['type'] == 'user') {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Container(
@@ -241,7 +297,10 @@ class _HomePageState extends State<HomePage> {
                     );
                   } else if (msg['type'] == 'text') {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: Container(
@@ -274,11 +333,9 @@ class _HomePageState extends State<HomePage> {
                   } else {
                     return const SizedBox.shrink();
                   }
-                }).toList(),
+                }),
               ],
             ),
-
-
 
             // Section Title
             SlideInLeft(
@@ -305,24 +362,24 @@ class _HomePageState extends State<HomePage> {
               visible: generatedContent == null && generatedImage == null,
               child: Column(
                 children: [
-                   SlideInLeft(
-                     delay: Duration(milliseconds: start),
-                     child: const FeatureBox(
+                  SlideInLeft(
+                    delay: Duration(milliseconds: start),
+                    child: const FeatureBox(
                       color: Pallete.firstSuggestionBoxColor,
                       headerText: "ChatGPT",
                       descriptionText:
                           "A Smarter Way To Stay Organised And Informed With ChatGPT!",
-                                       ),
-                   ),
-                   SlideInLeft(
-                     delay: Duration(milliseconds: start + delay),
-                     child: const FeatureBox(
+                    ),
+                  ),
+                  SlideInLeft(
+                    delay: Duration(milliseconds: start + delay),
+                    child: const FeatureBox(
                       color: Pallete.secondSuggestionBoxColor,
                       headerText: "Dall-E",
                       descriptionText:
                           "Get Inspired And Stay Creative With Your Personal Assistant Powered By Dall - E!",
-                                       ),
-                   ),
+                    ),
+                  ),
                   SlideInLeft(
                     delay: Duration(milliseconds: start + 2 * delay),
                     child: const FeatureBox(
@@ -339,11 +396,12 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
+
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const SizedBox(width: 30), // slight padding from the left edge
-
+          // Close button
           ZoomIn(
             delay: Duration(milliseconds: start + 4 * delay),
             child: FloatingActionButton(
@@ -351,18 +409,49 @@ class _HomePageState extends State<HomePage> {
               mini: true,
               backgroundColor: Colors.redAccent,
               onPressed: _resetApp,
-              child: const Icon(Icons.clear),
               tooltip: 'Reset App',
+              child: const Icon(Icons.clear),
             ),
           ),
-          const Spacer(), // pushes the mic to the right side
+
+          // Text input bar (Expanded to take available space)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _textController,
+                      decoration: const InputDecoration(
+                        hintText: 'Type your message...',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: 0,
+                          horizontal: 8,
+                        ),
+                      ),
+                      onSubmitted: _handleTextSubmitted,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.send),
+                    onPressed: () => _handleTextSubmitted(_textController.text),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Mic button
           ZoomIn(
             delay: Duration(milliseconds: start + 4 * delay),
             child: FloatingActionButton(
               heroTag: 'mic',
               backgroundColor: Pallete.firstSuggestionBoxColor,
               onPressed: () async {
-                if (await speechToText.hasPermission && !speechToText.isListening) {
+                if (await speechToText.hasPermission &&
+                    !speechToText.isListening) {
                   await startListening();
                 } else if (speechToText.isListening) {
                   await stopListening();
@@ -370,10 +459,8 @@ class _HomePageState extends State<HomePage> {
                   await initSpeechToText();
                 }
               },
-              child:  Icon(
-                speechToText.isListening ? Icons.stop : Icons.mic,
-              ),
               tooltip: 'Start Listening',
+              child: Icon(speechToText.isListening ? Icons.stop : Icons.mic),
             ),
           ),
           const SizedBox(width: 16), // right padding
