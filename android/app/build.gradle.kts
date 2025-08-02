@@ -5,6 +5,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+buildscript {
+    dependencies {
+        classpath("com.google.gms:google-services:4.4.1")
+        // ...existing code...
+    }
+}
+
 android {
     namespace = "com.amansaini.amanartify.aman_artify"
     compileSdk = flutter.compileSdkVersion
@@ -46,3 +53,5 @@ android {
 flutter {
     source = "../.."
 }
+
+apply(plugin = "com.google.gms.google-services")
